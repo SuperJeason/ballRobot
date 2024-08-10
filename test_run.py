@@ -48,15 +48,15 @@ class TestShowBasket(unittest.TestCase):
         self.assertEqual(showBasket(data_array), expected_output)
 
     def test_single_item_basket(self):
-        data_array = {'篮子1': [{'name': '红色', 'class': '苹果', 'confidence': 0.9}]}
+        data_array = {'篮子1': [{'name': '红色', 'class': '球', 'confidence': 0.9}]}
         expected_output = {'篮子1': 1}
         self.assertEqual(showBasket(data_array), expected_output)
 
     def test_multiple_items_basket(self):
         data_array = {
             '篮子1': [
-                {'name': '红色', 'class': '苹果', 'confidence': 0.9},
-                {'name': '绿色', 'class': '苹果', 'confidence': 0.8}
+                {'name': '红色', 'class': '球', 'confidence': 0.9},
+                {'name': '绿色', 'class': '球', 'confidence': 0.8}
             ]
         }
         expected_output = {'篮子1': 2}
@@ -65,11 +65,11 @@ class TestShowBasket(unittest.TestCase):
     def test_multiple_baskets(self):
         data_array = {
             '篮子1': [
-                {'name': '红色', 'class': '苹果', 'confidence': 0.9}
+                {'name': '红色', 'class': '球', 'confidence': 0.9}
             ],
             '篮子2': [
-                {'name': '绿色', 'class': '苹果', 'confidence': 0.8},
-                {'name': '黄色', 'class': '香蕉', 'confidence': 0.7}
+                {'name': '绿色', 'class': '球', 'confidence': 0.8},
+                {'name': '黄色', 'class': '球', 'confidence': 0.7}
             ]
         }
         expected_output = {'篮子1': 1, '篮子2': 2}
@@ -81,7 +81,7 @@ def main(test_case):
     elif test_case == "show_basket":
         unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestShowBasket))
     else:
-        print("Invalid test case. Please choose 'map_objects' or 'show_basket'.")
+        print("wuxiaoceshi")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run specific tests.")
