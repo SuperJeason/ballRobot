@@ -60,36 +60,44 @@ class TaskManager:
 # YOLOv8检测线程函数
 def yolov8_detection_thread(detection_result, stop_event):
     model = YOLO("yolov8_ball.pt")
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("testData\\test1.mp4")
+
+    frame_skip_interval = 10  # 设置跳帧的间隔
+    frame_count = 0  # 初始化帧计数器
 
     while not stop_event.is_set():
         ret, frame = cap.read()
         if not ret:
             continue
-
+        frame_count += 1
+        # 只处理每 frame_skip_interval 帧
+        if frame_count % frame_skip_interval != 0:
+            continue
         task_id, priority = detect_task_from_frame(frame, model)
-        if task_id:
-            detection_result["task_id"] = task_id
-            detection_result["priority"] = priority
-        time.sleep(0.1)  # 控制检测频率
+        if priority:
+            with lock:
+                detection_result["task_id"] = task_id
+                detection_result["priority"] = priority
 
     cap.release()
 
     # 测试Demo
-    # frame = cv2.imread("testData\\test2.JPG")
+    # frame = cv2.imread("testData\\test4.png")
     # task_id, priority = detect_task_from_frame(frame, model)
-    # if task_id:
-    #     detection_result["task_id"] = task_id
-    #     detection_result["priority"] = priority
+    # if priority:
+    #     with lock:
+    #         detection_result["task_id"] = task_id
+    #         detection_result["priority"] = priority
     # time.sleep(0.1)  # 控制检测频率
     # task_manager.stop_event.set()
+
 
 # 根据检测结果返回任务标志位
 def detect_task_from_frame(frame, model):
 
     # 定义自己阵营
     myTeam = "red"
-    results = model(frame)
+    results = model(frame, show=True, device=0)
     jsonRsult = json.loads((results[0].tojson()))
     classified_data = analyzePlace.classify_objects(jsonRsult)
     mapObjectsBall = analyzePlace.map_objects(classified_data)
@@ -102,13 +110,14 @@ def detect_task_from_frame(frame, model):
 
 # 根据标志位创建任务
 def create_task(task_id, priority):
+    if task_id == 5:
+        task_manager.stop_event.set()
     task_dict = {
         0: Task(f"放在{task_id}框", priority, task_function),
         1: Task(f"放在{task_id}框", priority, task_function),
         2: Task(f"放在{task_id}框", priority, task_function),
         3: Task(f"放在{task_id}框", priority, task_function),
         4: Task(f"放在{task_id}框", priority, task_function),
-        5: Task(f"任务结束，本次无需放球", priority, task_function),
     }
     return task_dict.get(task_id)
 
@@ -121,7 +130,7 @@ def task_function(interrupt, completed):
         if check_task_completion():
             completed.set()  # 标记任务完成
             return
-        time.sleep(0.1)
+        # time.sleep(0.1)
 
 
 # 检查任务是否完成的函数
@@ -138,7 +147,8 @@ if __name__ == "__main__":
     task_manager = TaskManager()
     detection_result = {"task_id": None, "priority": 0}
     yolov8_stop_event = threading.Event()
-
+    # 创建锁对象
+    lock = threading.Lock()
     # 启动YOLOv8检测线程
     yolov8_thread = threading.Thread(
         target=yolov8_detection_thread, args=(detection_result, yolov8_stop_event)
@@ -151,14 +161,15 @@ if __name__ == "__main__":
 
     # 主线程检查检测结果
     while not task_manager.stop_event.is_set():
-        if detection_result["task_id"] is not None:
-            new_task = create_task(
-                detection_result["task_id"], detection_result["priority"]
-            )
-            if new_task:
-                task_manager.check_new_task(new_task)
-            detection_result["task_id"] = None  # 清空检测结果
-        time.sleep(0.2)
+        with lock:
+            if detection_result["task_id"] is not None:
+                new_task = create_task(
+                    detection_result["task_id"], detection_result["priority"]
+                )
+                if new_task:
+                    task_manager.check_new_task(new_task)
+                detection_result["task_id"] = None  # 清空检测结果
+            time.sleep(0.1)
 
     # 停止所有线程
     task_manager.stop_event.set()

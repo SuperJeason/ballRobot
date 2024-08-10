@@ -1,5 +1,4 @@
 from ultralytics import YOLO
-import json
 
 model = YOLO("runs/detect/train/weights/best.pt")  # 加载自定义训练的模型
 
