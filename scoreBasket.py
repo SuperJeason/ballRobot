@@ -129,7 +129,8 @@ def choose_target_basket(data_array, basket_item_count, myTeam):
 
     # 分类篮子数量
     for basket, num in basket_item_count.items():
-        baskets_by_count[num].append(basket)
+        if num in baskets_by_count:
+            baskets_by_count[num].append(basket)
 
     if len(baskets_by_count[3]) == len(basket_item_count):
         print("游戏结束，所有桶已经满了")
@@ -154,8 +155,8 @@ def choose_target_basket(data_array, basket_item_count, myTeam):
         )
     elif baskets_by_count[0]:
         target_basket, priority = calculate_target(
-            basket_lists=baskets_by_count[2],
-            level=2,
+            basket_lists=baskets_by_count[0],
+            level=0,
             ball_data=data_array,
             myTeam=myTeam,
             victory_basket_count=victory_basket_count,
@@ -163,8 +164,8 @@ def choose_target_basket(data_array, basket_item_count, myTeam):
         )
     elif baskets_by_count[1]:
         target_basket, priority = calculate_target(
-            basket_lists=baskets_by_count[2],
-            level=2,
+            basket_lists=baskets_by_count[1],
+            level=1,
             ball_data=data_array,
             myTeam=myTeam,
             victory_basket_count=victory_basket_count,
