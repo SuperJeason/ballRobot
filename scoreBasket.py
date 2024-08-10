@@ -11,6 +11,8 @@ Returns:
     打印物品信息
 
 """
+
+
 def showBasket(data_array):
 
     # 创建一个新字典，键是篮子的名称，值是每个篮子的物品数量
@@ -31,7 +33,7 @@ Args:
     无
 
 Returns:
-    无返回值，函数运行结束后会直接打印游戏胜利或游戏结束。
+    返回目标target篮子,以及权重
 
 功能：
     根据读取的 JSON 文件中的数据，判断游戏的胜负情况。
@@ -40,6 +42,138 @@ Returns:
     最后，根据胜利桶的数量判断游戏的胜负情况，如果胜利桶数量大于等于3，则打印"游戏胜利"，否则根据篮子的优先级选择目标篮子。
 
 """
+
+
+def find_victory_basket(data_array, third_basket, myTeam):
+    victory_basket_count = 0
+    for basket in third_basket:
+        temp_basket = data_array[basket]
+        team_ball_count = sum(item["name"] == myTeam for item in temp_basket)
+        if team_ball_count >= 2 and temp_basket[2]["name"] == myTeam:
+            victory_basket_count += 1
+    return victory_basket_count
+
+
+def calculate_target(
+    basket_lists, level, ball_data, myTeam, victory_basket_count, baskets_by_count
+):
+    """
+    根据给定的篮子列表、等级和球数据计算目标值。
+
+    Args:
+        basket_list (list): 这里传进来的是目标篮子列表。(从这几种选一个)
+        level (int): 等级，取值范围为0, 1, 2。
+        ball_data (dict): 这里是球与篮子的映射关系。
+
+    Returns:
+        返回最终选择结果，以及优先级。
+
+    Raises:
+        ValueError: 如果传入的等级未定义（不在 1, 2, 3 范围内）。
+
+    """
+
+    def handle_level_0():
+        # 选择没有球的篮子
+        return basket_lists[0], 3
+
+    def handle_level_1():
+        # 只有一个球，挑选本方球
+        for l in basket_lists:
+            if ball_data[l][0]["name"] == myTeam:
+                return l, 2
+        # 只有一个球，挑选对方球
+        return basket_lists[0], 1
+
+    def handle_level_2():
+        # 有两个球的篮子，有三种情况
+        # 1. 两个球都是本方
+        # 2. 两个球都是对方
+        # 3. 一个球是本方，一个球是对方
+        baskets = {1: [], 2: [], 3: []}
+        for l in basket_lists:
+            if ball_data[l][0]["name"] == myTeam and ball_data[l][1]["name"] == myTeam:
+                baskets[1].append(l)
+            elif (
+                ball_data[l][0]["name"] != myTeam and ball_data[l][1]["name"] != myTeam
+            ):
+                baskets[2].append(l)
+            else:
+                baskets[3].append(l)
+        # 如果本方大胜桶少于对方，优先放置至少一个球是对方的桶
+        if 2 * victory_basket_count < len(baskets_by_count[3]):
+            if baskets[3]:
+                return baskets[3][0], 5
+            elif baskets[2]:
+                return baskets[2][0], 4
+            else:
+                return baskets[1][0], 4
+        else:
+            if baskets[3]:
+                return baskets[3][0], 5
+            elif baskets[1]:
+                return baskets[1][0], 4
+            else:
+                return baskets[2][0], 4
+
+    actions = {0: handle_level_0, 1: handle_level_1, 2: handle_level_2}
+    action = actions.get(level)
+    if action:
+        return action()
+    else:
+        raise ValueError(f"未定义的 level: {level}")
+
+
+def choose_target_basket(data_array, basket_item_count, myTeam):
+    baskets_by_count = {0: [], 1: [], 2: [], 3: []}
+
+    # 分类篮子数量
+    for basket, num in basket_item_count.items():
+        baskets_by_count[num].append(basket)
+
+    if len(baskets_by_count[3]) == len(basket_item_count):
+        print("游戏结束，所有桶已经满了")
+        return 5, 10
+
+    # 检查是否有胜利条件
+    victory_basket_count = find_victory_basket(data_array, baskets_by_count[3], myTeam)
+    if victory_basket_count >= 3:
+        print("游戏胜利")
+        return 5, 9
+
+    # 选择目标篮子
+    # 优先级: 2 -> 0 -> 1
+    if baskets_by_count[2]:
+        target_basket, priority = calculate_target(
+            basket_lists=baskets_by_count[2],
+            level=2,
+            ball_data=data_array,
+            myTeam=myTeam,
+            victory_basket_count=victory_basket_count,
+            baskets_by_count=baskets_by_count,
+        )
+    elif baskets_by_count[0]:
+        target_basket, priority = calculate_target(
+            basket_lists=baskets_by_count[2],
+            level=2,
+            ball_data=data_array,
+            myTeam=myTeam,
+            victory_basket_count=victory_basket_count,
+            baskets_by_count=baskets_by_count,
+        )
+    elif baskets_by_count[1]:
+        target_basket, priority = calculate_target(
+            basket_lists=baskets_by_count[2],
+            level=2,
+            ball_data=data_array,
+            myTeam=myTeam,
+            victory_basket_count=victory_basket_count,
+            baskets_by_count=baskets_by_count,
+        )
+    else:
+        target_basket = 5
+        priority = 10
+    return target_basket, priority
 
 
 def main():
@@ -52,63 +186,8 @@ def main():
         data_array = json.load(file)
 
     basket_item_count = showBasket(data_array)
-    zero_basket = []
-    one_basket = []
-    two_basket = []
-    third_basket = []
-    for basket, num in basket_item_count.items():
-        if num == 0:
-            zero_basket.append(basket)
-        elif num == 1:
-            one_basket.append(basket)
-        elif num == 2:
-            two_basket.append(basket)
-        else:
-            third_basket.append(basket)
-
-    # print(f"有 0 个物品的篮子: {zero_basket}")
-    # print(f"有 1 个物品的篮子: {one_basket}")
-    # print(f"有 2 个物品的篮子: {two_basket}")
-    # print(f"有 3 个物品的篮子: {third_basket}")
-
-    if len(third_basket) == len(basket_item_count):
-        print("游戏结束，所有桶已经满了")
-    else:
-        # 判断胜利桶
-        vactory_basket_count = 0
-        for basket in third_basket:
-            temp_basket = data_array[basket]
-            team_ball_count = 0
-            for item in temp_basket:
-                if item["name"] == myTeam:
-                    team_ball_count += 1
-            # 大胜桶判断
-            if team_ball_count >= 2 and data_array[basket][2]["name"] == myTeam:
-                vactory_basket_count += 1
-        if vactory_basket_count >= 3:
-            print("游戏胜利")
-        else:
-            # 判断目标篮子
-            # 有两个球的篮子优先放该框
-            if two_basket.__le__ != 0:
-                for basket in two_basket:
-                    temp_basket = data_array[basket]
-                    for item in temp_basket:
-                        target_basket = basket
-                        print(f"目标篮子是 {target_basket}")
-                        break
-            elif zero_basket.__le__ != 0:
-                target_basket = zero_basket[0]
-                print(f"目标篮子是 {target_basket}")
-            elif one_basket.__le__ != 0:
-                target_basket = one_basket[0]
-                for basket in one_basket:
-                    temp_basket = data_array[basket]
-                    if temp_basket[0]["class"] == myTeam:
-                        target_basket = basket
-                        print(f"目标篮子是 {target_basket}")
-                        break
-
+    task_id, priority = choose_target_basket(data_array, basket_item_count, myTeam)
+    print(f"篮子 ID: {task_id}, 优先级: {priority}")
 
 if __name__ == "__main__":
     main()

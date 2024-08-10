@@ -11,7 +11,7 @@ def classify_objects(data_array, calculate_center=True):
     class_dict = {0: [], 1: [], 2: []}
 
     for item in data_array:
-        class_id = item.get("class")
+        class_id = item.get("class",0)
         if class_id in class_dict:
             # 如果需要计算中心点
             if calculate_center:
