@@ -60,9 +60,10 @@ class TaskManager:
 # YOLOv8检测线程函数
 def yolov8_detection_thread(detection_result, stop_event):
     model = YOLO("yolov8_ball.pt")
-    cap = cv2.VideoCapture("testData\\test1.mp4")
+    model.to("cpu")
+    cap = cv2.VideoCapture("test_video.mp4")
 
-    frame_skip_interval = 10  # 设置跳帧的间隔
+    frame_skip_interval = 30  # 设置跳帧的间隔
     frame_count = 0  # 初始化帧计数器
 
     while not stop_event.is_set():
@@ -97,7 +98,7 @@ def detect_task_from_frame(frame, model):
 
     # 定义自己阵营
     myTeam = "red"
-    results = model(frame, show=True, device=0)
+    results = model(frame, show=True, device='cpu')
     jsonRsult = json.loads((results[0].tojson()))
     classified_data = analyzePlace.classify_objects(jsonRsult)
     mapObjectsBall = analyzePlace.map_objects(classified_data)
@@ -130,7 +131,7 @@ def task_function(interrupt, completed):
         if check_task_completion():
             completed.set()  # 标记任务完成
             return
-        # time.sleep(0.1)
+        #time.sleep(0.1)
 
 
 # 检查任务是否完成的函数
