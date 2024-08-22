@@ -36,91 +36,6 @@ class Task:
             post_task_function()  # 调用任务完成后的处理函数
 
 
-# YOLOv8检测线程函数
-def yolov8_detection_thread(detection_result, stop_event):
-    model = YOLO("yolov8_ball.pt")
-    model.to("cuda" if torch.cuda.is_available() else "cpu")
-    cap = cv2.VideoCapture("testData\\test1.mp4")
-    cv2.namedWindow("YOLOv8 Detection", cv2.WINDOW_NORMAL)
-
-    frame_queue = queue.Queue(maxsize=10)  # 队列大小为10
-
-    producer_thread = threading.Thread(
-        target=frame_producer, args=(cap, frame_queue, stop_event)
-    )
-    producer_thread.start()
-
-    frame_count = 0
-    process_every_n_frames = 1  # 每20帧进行一次处理
-
-    while not stop_event.is_set():
-        if not frame_queue.empty():  # 检查队列中是否有帧
-            frame = frame_queue.get()  # 从队列中取出帧
-            frame_count += 1
-
-            if frame_count % process_every_n_frames == 0:
-                results = model(
-                    frame, device="cuda" if torch.cuda.is_available() else "cpu"
-                )
-
-                annotated_frame = results[0].plot()  # 绘制检测结果
-                cv2.imshow("YOLOv8 Detection", annotated_frame)
-
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    stop_event.set()
-                    task_manager.stop_event.set()
-                    break
-
-                # 将检测结果转换为JSON格式
-                jsonResult = json.loads(results[0].tojson())
-                classified_data = analyzePlace.classify_objects(jsonResult)
-                mapObjectsBall = analyzePlace.map_objects(classified_data)
-                basket_item_count = scoreBasket.showBasket(mapObjectsBall)
-                task_id, priority = scoreBasket.choose_target_basket(
-                    mapObjectsBall, basket_item_count, "red"
-                )
-
-                with lock:  # 更新检测结果
-                    detection_result["task_id"] = task_id
-                    detection_result["priority"] = priority
-            else:
-                cv2.imshow("YOLOv8 Detection", frame)  # 显示原始帧
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    stop_event.set()
-                    task_manager.stop_event.set()
-                    break
-        else:
-            time.sleep(0.01)
-
-    print("YOLOv8检测线程正在退出")
-    cv2.destroyAllWindows()
-    producer_thread.join()  # 等待生产者线程结束
-
-
-# 任务函数（假设定义为全局函数或类方法）
-def task_function(interrupt, completed):
-    print("正在执行任务：")
-    start_time = time.time()
-    while not interrupt.is_set() and not task_manager.stop_event.is_set():
-        if check_task_completion() or (
-            time.time() - start_time > 5
-        ):  # 假设5秒后任务完成
-            completed.set()
-            break
-        time.sleep(0.1)
-    print("任务完成")
-
-
-# 示例任务完成检查函数
-def check_task_completion():
-    return True  # 示例：任务直接完成
-
-
-# 后置任务处理函数
-def post_task_function():
-    print("重新返回拿球")
-
-
 # 任务管理器类
 class TaskManager:
     def __init__(self):
@@ -146,15 +61,99 @@ class TaskManager:
 
     def check_new_task(self, new_task):
         with self.task_lock:
-            if not self.current_task or new_task.priority > self.current_task.priority:
-                if self.current_task:
-                    print(
-                        f"发现更高优先级任务: {new_task.name}，中断当前任务: {self.current_task.name}"
-                    )
-                    self.current_task.interrupt.set()  # 中断当前任务
-                self.current_task = new_task
-                return True
-        return False
+            if self.current_task and new_task.priority < self.current_task.priority:
+                print(
+                    f"发现更高优先级任务: {new_task.name}，中断当前任务: {self.current_task.name}"
+                )
+                self.current_task.interrupt.set()  # 中断当前任务
+            self.current_task = new_task
+
+
+# YOLOv8检测线程函数
+def yolov8_detection_thread(detection_result, stop_event):
+    model = YOLO("yolov8_ball.pt")
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    cap = cv2.VideoCapture("testData\\test1.mp4")
+
+    frame_queue = queue.Queue(maxsize=10)  # 队列大小为10
+
+    producer_thread = threading.Thread(
+        target=frame_producer, args=(cap, frame_queue, stop_event)
+    )
+    producer_thread.start()
+
+    frame_count = 0
+    process_every_n_frames = 1  # 每20帧进行一次处理
+
+    while not stop_event.is_set():
+        if not frame_queue.empty():  # 检查队列中是否有帧
+            frame = frame_queue.get()  # 从队列中取出帧
+            frame_count += 1
+
+            if frame_count % process_every_n_frames == 0:
+                results = model(
+                    frame, device="cuda" if torch.cuda.is_available() else "cpu"
+                )
+
+                annotated_frame = results[0].plot() 
+                # 获取原始帧的尺寸
+                height, width, channels = annotated_frame.shape
+
+                # 设置新的宽度（例如800像素），然后计算新的高度以保持宽高比
+                new_width = 800
+                new_height = int(height * (new_width / width))
+
+                # 使用cv2.resize调整帧的尺寸
+                resized_frame = cv2.resize(annotated_frame, (new_width, new_height))
+
+                # 显示调整尺寸后的帧
+                cv2.imshow("YOLOv8 Detection", resized_frame)
+
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    stop_event.set()
+                    task_manager.stop_event.set()
+                    break
+
+                # 将检测结果转换为JSON格式
+                jsonResult = json.loads(results[0].tojson())
+                classified_data = analyzePlace.classify_objects(jsonResult)
+                mapObjectsBall = analyzePlace.map_objects(classified_data)
+                basket_item_count = scoreBasket.showBasket(mapObjectsBall)
+                task_id, priority = scoreBasket.choose_target_basket(
+                    mapObjectsBall, basket_item_count, "red"
+                )
+                with lock:  # 更新检测结果
+                    detection_result["task_id"] = task_id
+                    detection_result["priority"] = priority
+            else:
+                cv2.imshow("YOLOv8 Detection", frame)  # 显示原始帧
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    stop_event.set()
+                    task_manager.stop_event.set()
+                    break
+        else:
+            time.sleep(0.01)
+
+    print("YOLOv8检测线程正在退出")
+    cv2.destroyAllWindows()
+    producer_thread.join()  # 等待生产者线程结束
+
+
+# 任务函数（假设定义为全局函数或类方法）
+def task_function(interrupt, completed):
+    print("正在执行任务")
+    print("任务完成")
+    completed.set()
+
+
+# 示例任务完成检查函数
+def check_task_completion():
+    return True  # 示例：任务直接完成
+
+
+# 后置任务处理函数
+def post_task_function():
+    print("重新返回拿球")
 
 
 # 创建任务对象
